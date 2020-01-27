@@ -8,7 +8,7 @@ output_dir = os.path.abspath('test')
 input_dir = os.path.abspath('dokumenter/09-hist/dir1/')
 log_dir = os.path.abspath('log')
 
-test.client.containers.run(docker_image, '/bin/bash',
+test = client.containers.run(docker_image, '/bin/bash',
                             detach=True,
                             tty=True,
                             volumes={log_dir: {'bind': '/opt/log', 'mode': 'rw'},

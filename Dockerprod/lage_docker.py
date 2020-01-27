@@ -22,6 +22,7 @@ test.exec_run('apt-get install -y siegfried')
 test.exec_run('apt-get install -y python3-pip')
 test.exec_run('pip3 install extract_msg')
 test.exec_run('pip3 install pendulum')
+test.exec_run('pip3 install zmq')
 instansnavn = f"laralv/ubuntu-libreoffice"
 test.commit(instansnavn)
 print(instansnavn)

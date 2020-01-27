@@ -7,6 +7,11 @@ import pathlib
 import random
 import time
 import pendulum
+import zmq
+
+context = zmq.Context()
+receiver = context.socket(zmq.PULL)
+receiver.bind("tcp://*:5558")
 
 client = docker.from_env()
 docker_image = 'laralv/ubuntu-libreoffice:latest'
@@ -59,13 +64,15 @@ for container in range(1, cpu_workers+1):
                                                                 working_dir='/mnt/disk1/')
 #    containers[container].exec_run('sf -update')
 # Middlertidig hjem i /opt/
+    containers[container].exec_run('pip3 install zmq')
     containers[container].exec_run(f"python3 /opt/log/convert.py -n {container}", user='libreoffice', detach=True)
     print(f'Container {container} is running')
-
 lock = {}
 for y in range(1, cpu_workers+1):
     lock[y] = 'running'
 while not all(value == 'done' for value in lock.values()):
+    test = receiver.recv()
+    print(test)
     for x in lock:
         if pathlib.Path(f'{log_dir}/output/lock/{x}').is_file is True:
             lock[x] = 'done'
@@ -75,7 +82,7 @@ while not all(value == 'done' for value in lock.values()):
             output_filecounter += 1
     print(f'{pendulum.now().format("YYYY-MM-DD HH:mm:ss")}\t{output_filecounter} of {input_number_of_files}')
     print(lock)
-    time.sleep(10)
+#    time.sleep(10)
 
 # python3 /home/lars/politipilot/git/controller.py -i dokumenter/09-hist/dir1 -o test/ -l log/
 # docker kill $(docker ps -q)
