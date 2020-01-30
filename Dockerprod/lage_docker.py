@@ -20,6 +20,7 @@ test.exec_run('apt-key adv --fetch-keys https://bintray.com/user/downloadSubject
 test.exec_run("add-apt-repository 'deb http://dl.bintray.com/siegfried/debian wheezy main'")
 test.exec_run('apt-get install -y siegfried')
 test.exec_run('apt-get install -y python3-pip')
+test.exec_run('apt-get install -y net-tools')
 test.exec_run('pip3 install extract_msg')
 test.exec_run('pip3 install pendulum')
 test.exec_run('pip3 install zmq')
