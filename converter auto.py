@@ -31,6 +31,7 @@ namespace = {'siard': 'http://www.bar.admin.ch/xmlns/siard/2/table.xsd',
              'xml-schema': 'http://www.w3.org/2001/XMLSchema'
             }
 table = 'table102'
+table_name = 'edoktab'
 temp_dir = 'temp/'
 pathlib.Path(temp_dir).mkdir(parents=True, exist_ok=True)
 results_dir = 'results/'
@@ -109,6 +110,12 @@ for fil in glob.glob(f"{os.path.relpath(document_dir, working_dir)}/**/*", recur
 zip = zipfile.ZipFile(siard_filename)
 logging('Unpacking SIARD-file')
 zip.extractall(temp_dir)
+
+### TESTFUNKSJON FOR Å HENTE AUTOMAGISK FRA databasen
+root_metadata = etree.parse(temp_dir + "header/metadata.xml")
+doktable = root_metadata.xpath('//siard-metadata:name[text()="' + table_name +'"]/..', namespaces=namespace)[0]
+table = doktable.xpath('siard-metadata:folder', namespaces=namespace)[0].text
+metadata_col = 'c' + str(len(doktable.xpath('siard-metadata:columns/siard-metadata:column', namespaces=namespace)) + 1)
 
 # Leser ut tabellen
 logging('Processing SIARD, this might take a while...')
@@ -213,7 +220,9 @@ pronom_type['fmt/388']   = {'Name': 'Internet Calendar and Scheduling format', '
 pronom_type['fmt/357']   = {'Name': '3GPP Audio/Video File', 'convert': 'skip'}
 pronom_type['x-fmt/119'] = {'Name': 'Windows Metafile Image', 'convert': 'skip'}
 pronom_type['fmt/561']   = {'Name': 'Adobe Illustrator 12.0', 'convert': 'skip'}
+pronom_type['fmt/562']   = {'Name': 'Adobe Illustrator 12.0', 'convert': 'skip'}
 pronom_type['fmt/443']   = {'Name': 'Microsoft Visio Drawing 2003-2010', 'convert': 'skip'}
+pronom_type['fmt/494']   = {'Name': 'Microsoft Office Encrypted Document 2007 Onwards', 'convert': 'skip'}
 
 pronom_type['x-fmt/430'] = {'Name': 'Microsoft Outlook Email Message', 'convert': 'email'}
 
@@ -224,7 +233,6 @@ results['unconverted'] = {}
 results['new unconverted'] = {}
 results['discrepancies'] = []
 results['timedout'] = []
-results['unicode_error_files'] = []
 results['stats'] = {}
 results['stats']['converted'] = 0
 results['stats']['unconverted'] = 0
@@ -301,12 +309,12 @@ for x in root.xpath('siard:row', namespaces=namespace):
         if os.path.isfile(args_output['ny']['filename']) is True:
             args_output['ny'] = siegfriedtest(args_output['ny']['filename'])
             logging(f"{results['stats']['converted'] +results['stats']['unconverted']}/{total_files}\t{args_output['gammel']['filename']}\t ({args_output['gammel']['pronom']} to {args_output['ny']['pronom']})")
-            x.append(add_node(args_output['ny'], 'c52'))
+            x.append(add_node(args_output['ny'], metadata_col))
             if os.path.isfile(args_output['gammel']['filename']) is True:
                 pathlib.Path(args_output['gammel']['filename']).unlink()
     else:
         if os.path.isfile(args_output['gammel']['filename']) is True:
-            x.append(add_node(args_output['gammel'], 'c52'))
+            x.append(add_node(args_output['gammel'], metadata_col))
             logging(f"{results['stats']['converted'] + results['stats']['unconverted']}/{total_files}\t{args_output['gammel']['filename']}\t ({args_output['gammel']['pronom']})")
     log_file.close()
 
@@ -324,30 +332,14 @@ for value in results['stats'].keys():
 if results['discrepancies'] != []:
     results_out += f"\nFilreferanser som manglet filer:\n\n"
     for x in results['discrepancies']:
-        try:
-            results_out += f"{x}\n"
-        except UnicodeEncodeError:
-            results_out += f"{ascii(x)}\n"
-            results['unicode_error_files'].append(ascii(x))
+        results_out += f"{x}\n"
 results_out += f"\nFiler som manglet referanse fra databasen:\n\n"
 for value in file_list:
     if file_list[value] is False:
-        try:
-            results_out += f"{value}\n"
-        except UnicodeEncodeError:
-            results_out += f"{ascii(value)}\n"
-            results['unicode_error_files'].append(ascii(x))
+        results_out += f"{value}\n"
 if results['timedout'] != []:
     results_out += f"\n\nFiler som timet ut i konverteringsprosessen:\n"
     for x in results['timedout']:
-        try:
-            results_out += f"{x}\n"
-        except UnicodeEncodeError:
-            results_out += f"{ascii(x)}\n"
-            results['unicode_error_files'].append(ascii(x))
-if results['unicode_error_files'] != []:
-    results_out += f"\n\nFiler med tegnsettfeil:\n"
-    for x in results['unicode_error_files']:
         results_out += f"{x}\n"
 if results['new unconverted'] != {}:
     results_out += '\nNye pronomkoder som ikke har vært i bruk før:\n\n'
@@ -359,7 +351,10 @@ for value in results['converted']:
 results_out += '\n\nIkke-konverterte pronomkoder:\n\n'
 for value in results['unconverted']:
     results_out += f"{value.ljust(10, ' ')}\t{len(results['unconverted'][value])}\t{pronom_type[value]['Name']}\n"
-results_file.write(results_out)
+try:
+    results_file.write(results_out)
+except UnicodeEncodeError:
+    results_file.write(ascii(results_out))
 results_file.close()
 
 ## Skriver til SIARD-tabellen
@@ -375,7 +370,7 @@ root_metadata.write(temp_dir + "header/metadata.xml", pretty_print=True, encodin
 ## Legger til i xsden til tabellen
 root_xsd = etree.parse(temp_dir + siard_table[:-3] + 'xsd')
 root_xsd_element = root_xsd.xpath('//xml-schema:complexType[@name = "recordType"]/xml-schema:sequence', namespaces=namespace)[0]
-root_xsd_element.append(add_node_xsd('c52'))
+root_xsd_element.append(add_node_xsd(metadata_col))
 root_xsd.write(temp_dir + siard_table[:-3] + 'xsd', pretty_print=True, encoding='utf-8')
 
 shutil.make_archive(f"{pathlib.Path(siard_filename).stem}_conv", 'zip', temp_dir)
